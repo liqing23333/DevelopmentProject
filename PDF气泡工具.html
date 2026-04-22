@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF气泡标记工具</title>
+    <script src="./PDF_files/pdf.min.js"></script>
+     <!-- 引入 pdf-lib -->
+    <script src="./PDF_files/pdf-lib.min.js"></script>   
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .title {
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+        
+        .controls {
+            background: #ecf0f1;
+            padding: 15px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: #2c3e50;
+        }
+        
+        .controls-container {
+            display: flex;
+            gap: 15px; /* 控制组之间的边距 */
+            flex-wrap: wrap;
+            align-items: center; /* 垂直居中对齐 */
+            padding-left: 20px; /* 左侧空出的空间 */
+            margin-top: 20px; /* 上边距 */
+        }
+        .control-group label {
+            white-space: nowrap; /* 防止标签换行 */
+        }
+    
+        button {
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+        
+        button.start {
+            background: #27ae60;
+            color: white;
+            font-weight: bold;
+        }
+        
+        button.start:hover {
+            background: #229954;
+        }
+        
+        button.stop {
+            background: #e74c3c;
+            color: white;
+            font-weight: bold;
+        }
+        
+        button.stop:hover {
+            background: #c0392b;
+        }
+        
+        button.delete {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        button.delete:hover {
+            background: #7f8c8d;
+        }
+        
+        button.save {
+            background: #3498db;
+            color: white;
+        }
+        
+        button.save:hover {
+            background: #2980b9;
+        }
+        
+        input, select {
+            padding: 6px 8px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .pdf-container {
+            flex: 1;
+            overflow-y: auto;
+            /* 添加水平滚动支持 */
+            overflow-x: auto;
+            padding: 20px;
+            background: #ddd;
+            display: flex;
+            flex-direction: column;
+            /* 移除居中对齐，改为左对齐 */
+            /* align-items: center; */
+        }
+        
+        .pdf-page {
+            margin: 10px 0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            position: relative;
+            background: white;
+            /* 添加自动外边距，在小屏幕上居中显示 */
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        .circle-annotation {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            z-index: 10;
+            border: 2px solid #000;
+            background: white;
+            color: #000;
+            font-size: 16px;
+        }
+        
+        .circle-annotation.shape-circle {
+            border-radius: 50%;
+        }
+        
+        .circle-annotation.shape-square {
+            border-radius: 4px;
+        }     
+        
+        .circle-annotation.selected {
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #3498db;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+        }
+        
+        .modal-title {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-size: 1.2em;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #2c3e50;
+            font-size: 0.9em;
+        }
+        
+        .button-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .status-bar {
+            background: #34495e;
+            color: white;
+            padding: 8px 20px;
+            font-size: 0.9em;
+        }
+        
+        .adding-mode {
+            cursor: crosshair;
+        }
+        
+        .btn-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        
+        .btn-indicator.active {
+            background: white;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.5; }
+        }
+        /* 拖放区域样式 */
+        .drop-area {
+            border: 2px dashed #3498db;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            color: #3498db;
+            margin: 20px;
+            transition: all 0.3s;
+            width: calc(100% - 40px); /* 减去左右边距 */
+            height: calc(100% - 40px); /* 减去上下边距 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .drop-area.active {
+            border-color: #2ecc71;
+            background-color: rgba(46, 204, 113, 0.1);
+        }
+
+        .drop-area p {
+            margin: 0;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="display: flex; align-items: center; gap: 30px;">
+            <div class="title">PDF气泡标记工具</div>
+            <button id="showChangelog" class="save">更新说明</button>
+        </div>
+        <button id="loadPdf" class="start">选择PDF文件</button>
+    </div>
+    
+<div class="controls-container">
+    <div class="control-group">
+        <label>气泡形状:</label>
+        <select id="shapeType">
+            <option value="circle">圆形</option>
+            <option value="square">正方形</option>
+        </select>
+    </div>
+    <!-- 添加圆圈大小控制 -->
+    <div class="control-group">
+        <label>气泡大小:</label>
+        <input type="range" id="circleSize" min="20" max="50" value="30">
+        <span id="circleSizeValue">30px</span>
+    </div>
+    <div class="control-group">
+        <label>气泡边框颜色:</label>
+        <input type="color" id="circleBorderColor" value="#FF0000">
+    </div>
+    <div class="control-group">
+        <label>气泡填充颜色:</label>
+        <input type="color" id="circleFillColor" value="#FF0000">
+    </div>
+    <div class="control-group">
+        <label>文字颜色:</label>
+        <input type="color" id="textColor" value="#FFFFFF">
+    </div>
+    <div class="control-group">
+            <label>文字大小:</label>
+        <input type="range" id="textSize" min="10" max="30" value="12">
+        <span id="textSizeValue">12px</span>
+    </div>
+    <!-- 添加PDF缩放控制 -->
+    <div class="control-group">
+        <label>PDF缩放:</label>
+        <input type="range" id="pdfScale" min="50" max="300" value="100">
+        <span id="pdfScaleValue">100%</span>
+    </div>
+</div>
+
+    <div class="controls">
+        <input type="file" id="pdfFile" accept=".pdf" style="display: none;">
+        
+        <button id="toggleAddBtn" class="start">
+            <span class="btn-indicator" id="addIndicator"></span>开始添加序号
+        </button>
+        
+        <button id="deleteBtn" class="delete">删除序号</button>
+        <button id="saveBtn" class="save">保存为PDF</button>
+    </div>
+    
+    <div class="main-container">
+        <div class="pdf-container" id="pdfContainer">
+            <div class="drop-area" id="dropArea">
+                <p>将PDF文件拖放到此处，或点击上方"选择PDF文件"按钮</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-bar" id="statusBar">就绪</div>
+    
+    <div class="modal" id="numberModal">
+        <div class="modal-content">
+            <div class="modal-title">输入序号</div>
+            <div class="form-group">
+                <label for="numberInput">序号数字:</label>
+                <input type="number" id="numberInput" min="1" value="1">
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="batchUpdate">
+                    批量更新大于原序号的所有序号
+                </label>
+            </div>
+            <div class="button-group">
+                <button id="cancelBtn">取消</button>
+                <button id="confirmBtn">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="changelogModal">
+        <div class="modal-content" style="width: 700px;">
+            <div class="modal-title">更新说明：</div>
+            <div style="line-height: 1.8; color: #2c3e50;">
+                <p>• Log</p>
+                <p>• 增加正方形气泡</p>
+                <p>• 增加修改序号后批量更新其他序号的功能</p>
+                <p>• 增加标记/修改序号时右键确认的功能</p>
+                <p>• 来源网络</p>
+            </div>
+            <div class="button-group">
+                <button id="closeChangelogBtn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = './PDF_files/pdf.worker.min.js';
+        
+        let pdfDoc = null;
+        let currentScale = 1.0; // 默认100%缩放
+        let annotations = [];
+        let selectedAnnotation = null;
+        let isAddingMode = false;
+        let currentClickX = 0;
+        let currentClickY = 0;
+        let currentPageNumber = 1;
+        var pdfBytes = null;
+        let isDeleteMode = false; // 标志位用于控制删除模式
+         
+        const pdfFile = document.getElementById('pdfFile');
+        const loadPdf = document.getElementById('loadPdf');
+        const toggleAddBtn = document.getElementById('toggleAddBtn');
+        const addIndicator = document.getElementById('addIndicator');
+        const pdfContainer = document.getElementById('pdfContainer');
+        const numberModal = document.getElementById('numberModal');
+        const numberInput = document.getElementById('numberInput');
+        const confirmBtn = document.getElementById('confirmBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const statusBar = document.getElementById('statusBar');
+        
+        const circleSize = document.getElementById('circleSize');
+        const circleSizeValue = document.getElementById('circleSizeValue');
+        const textSize = document.getElementById('textSize');
+        const textSizeValue = document.getElementById('textSizeValue');
+        // 添加缩放控制元素
+        const pdfScale = document.getElementById('pdfScale');
+        const pdfScaleValue = document.getElementById('pdfScaleValue');
+        const shapeType = document.getElementById('shapeType');
+
+        // 获取拖放区域元素
+        const dropArea = document.getElementById('dropArea');
+        const changelogModal = document.getElementById('changelogModal');
+        const showChangelogBtn = document.getElementById('showChangelog');
+        const closeChangelogBtn = document.getElementById('closeChangelogBtn');
+
+        // 更新说明弹窗事件
+        showChangelogBtn.addEventListener('click', () => {
+            changelogModal.style.display = 'flex';
+        });
+
+        closeChangelogBtn.addEventListener('click', () => {
+            changelogModal.style.display = 'none';
+        });
+
+        // 点击弹窗外部关闭
+        changelogModal.addEventListener('click', (e) => {
+            if (e.target === changelogModal) {
+                changelogModal.style.display = 'none';
+            }
+        });
+// 拖放事件处理
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    dropArea.addEventListener(eventName, preventDefaults, false);
+    document.body.addEventListener(eventName, preventDefaults, false);
+});
+
+// 高亮拖放区域
+['dragenter', 'dragover'].forEach(eventName => {
+    dropArea.addEventListener(eventName, highlight, false);
+});
+
+// 取消高亮
+['dragleave', 'drop'].forEach(eventName => {
+    dropArea.addEventListener(eventName, unhighlight, false);
+});
+
+// 处理文件拖放
+dropArea.addEventListener('drop', handleDrop, false);
+
+// 阻止默认行为
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+// 高亮拖放区域
+function highlight() {
+    dropArea.classList.add('active');
+}
+
+// 取消高亮
+function unhighlight() {
+    dropArea.classList.remove('active');
+}
+
+// 处理拖放的文件
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const file = dt.files[0];
+    
+    if (file && file.type === 'application/pdf') {
+        // 处理PDF文件
+        handlePdfFile(file);
+    } else {
+        statusBar.textContent = '请拖放PDF文件';
+    }
+}
+
+// 处理PDF文件的通用函数（重构原有的加载逻辑）
+function handlePdfFile(file) {
+    try {
+        statusBar.textContent = '正在加载PDF文件...';
+        const fileReader = new FileReader();
+        
+        fileReader.onload = async function() {
+            try {
+                const typedarray = new Uint8Array(this.result);
+                pdfBytes = this.result;
+                window.pdfBytes = this.result;
+               
+                pdfDoc = await pdfjsLib.getDocument({data: typedarray}).promise;
+                await renderPDF();
+                statusBar.textContent = `已加载PDF文件，共${pdfDoc.numPages}页`;
+                
+                // 隐藏拖放区域
+                dropArea.style.display = 'none';
+            } catch (error) {
+                statusBar.textContent = '渲染PDF失败: ' + error.message;
+                console.error('Error rendering PDF:', error);
+            }
+        };
+        
+        fileReader.readAsArrayBuffer(file);
+    } catch (error) {
+        statusBar.textContent = '加载PDF失败: ' + error.message;
+        console.error('Error loading PDF:', error);
+    }
+}
+
+// 修改原有的loadPDF函数，复用handlePdfFile
+function loadPDF(e) {
+    const file = e.target.files[0];
+    if (file) {
+        handlePdfFile(file);
+    }
+}
+        
+        loadPdf.addEventListener('click', () => pdfFile.click());
+        pdfFile.addEventListener('change', loadPDF);
+        toggleAddBtn.addEventListener('click', toggleAddMode);
+        confirmBtn.addEventListener('click', addAnnotation);
+        cancelBtn.addEventListener('click', cancelAddAnnotation);
+        deleteBtn.addEventListener('click', deleteSelected);
+        saveBtn.addEventListener('click', saveAsPDF);
+ 
+// 添加右键确认功能：当弹窗显示时，右键点击自动确认
+document.addEventListener('contextmenu', function(e) {
+    if (numberModal.style.display === 'flex') {
+        e.preventDefault();
+        if (window.currentEditId) {
+            // 如果是编辑模式，执行编辑确认
+            const annId = window.currentEditId;
+            const annIndex = annotations.findIndex(ann => ann.id.toString() === annId.toString());
+            if (annIndex !== -1) {
+                const oldNumber = annotations[annIndex].number;
+                const newNumber = parseInt(numberInput.value);
+                if (isNaN(newNumber) || newNumber <= 0) {
+                    statusBar.textContent = '请输入有效的正整数';
+                    return;
+                }
+
+                const batchUpdate = document.getElementById('batchUpdate').checked;
+                const delta = newNumber - oldNumber;
+
+                if (batchUpdate && delta !== 0) {
+                    annotations.forEach(ann => {
+                        if (ann.number > oldNumber) {
+                            ann.number += delta;
+                        }
+                    });
+                }
+
+                annotations[annIndex].number = newNumber;
+                document.querySelectorAll('.circle-annotation').forEach(el => el.remove());
+                annotations.forEach(ann => addAnnotationToPage(ann));
+                
+                numberModal.style.display = 'none';
+                currentClickX = 0;
+                currentClickY = 0;
+                if (selectedAnnotation) {
+                    selectedAnnotation.classList.remove('selected');
+                    selectedAnnotation = null;
+                }
+                window.currentEditId = null;
+                
+                if (batchUpdate && delta !== 0) {
+                    statusBar.textContent = `序号已从 ${oldNumber} 更新为 ${newNumber}，已批量更新所有大于 ${oldNumber} 的序号，变化量 ${delta > 0 ? '+' : ''}${delta}`;
+                } else {
+                    statusBar.textContent = `序号已更新为 ${newNumber}`;
+                }
+            }
+        } else if (currentClickX !== 0 && currentClickY !== 0) {
+            // 如果是添加模式，执行添加确认
+            addAnnotation();
+        }
+        return false;
+    }
+});
+
+// 删除按钮点击事件监听器
+deleteBtn.addEventListener('click', () => {
+    isDeleteMode = !isDeleteMode;
+    if (isDeleteMode) {
+        deleteBtn.classList.add('active'); // 添加视觉反馈
+        deleteBtn.textContent = '✅ 删除模式';
+        statusBar.textContent = '已进入删除模式，点击序号可直接删除';
+    } else {
+        deleteBtn.classList.remove('active');
+        deleteBtn.textContent = '🗑️ 删除序号';
+        statusBar.textContent = '已退出删除模式';
+    }
+});
+
+// 所有页面容器的点击事件（确保只绑定一次）
+document.querySelector('.pdf-container').addEventListener('click', (e) => {
+    if (e.target.classList.contains('circle-annotation')) {
+        if (isDeleteMode) {
+            // 直接删除
+            e.target.remove();
+            const annId = e.target.id.replace('ann-', '');
+            annotations = annotations.filter(ann => ann.id.toString() !== annId.toString());
+            statusBar.textContent = `序号 ${annId} 已删除`;
+            return; // 阻止后续逻辑
+        }
+
+        // 非删除模式：进入编辑
+        if (selectedAnnotation) {
+            selectedAnnotation.classList.remove('selected');
+        }
+        e.target.classList.add('selected');
+        selectedAnnotation = e.target;
+        window.currentEditId = e.target.id.replace('ann-', '');
+        numberInput.value = annotations.find(ann => ann.id.toString() === selectedAnnotation.id.replace('ann-', '')).number;
+        numberModal.style.display = 'flex';
+        numberInput.focus();
+        statusBar.textContent = '编辑序号数字，按回车键确认';
+        // 关键修复：点击已有序号进行编辑时，清空点击位置信息，避免添加新序号
+        currentClickX = 0;
+        currentClickY = 0;
+    }
+});
+
+
+        confirmBtn.addEventListener('click', function() {
+            const annId = window.currentEditId;
+            if (!annId) {
+                statusBar.textContent = '未选择任何序号';
+                return;
+            }
+            
+            const annIndex = annotations.findIndex(ann => ann.id.toString() === annId.toString());
+            if (annIndex !== -1) {
+                const oldNumber = annotations[annIndex].number;
+                const newNumber = parseInt(numberInput.value);
+                if (isNaN(newNumber) || newNumber <= 0) {
+                    statusBar.textContent = '请输入有效的正整数';
+                    return;
+                }
+
+                const batchUpdate = document.getElementById('batchUpdate').checked;
+                const delta = newNumber - oldNumber;
+
+                // 如果启用批量更新且变化量不为0，更新所有大于原序号的序号
+                if (batchUpdate && delta !== 0) {
+                    annotations.forEach(ann => {
+                        if (ann.number > oldNumber) {
+                            ann.number += delta;
+                        }
+                    });
+                }
+
+                // 更新当前标注信息
+                annotations[annIndex].number = newNumber;
+                
+                // 如果需要更新颜色或其他属性，也可以在这里添加
+                const borderColor = document.getElementById('circleBorderColor').value;
+                const fillColor = document.getElementById('circleFillColor').value;
+                const textColor = document.getElementById('textColor').value;
+
+                // 重新渲染所有标注
+                document.querySelectorAll('.circle-annotation').forEach(el => el.remove());
+                annotations.forEach(ann => addAnnotationToPage(ann));
+                
+                numberModal.style.display = 'none';
+                // 关键修复：编辑完成后清空点击位置信息，避免添加新序号
+                currentClickX = 0;
+                currentClickY = 0;
+                selectedAnnotation.classList.remove('selected');
+                selectedAnnotation = null;
+                window.currentEditId = null;
+                
+                if (batchUpdate && delta !== 0) {
+                    statusBar.textContent = `序号已从 ${oldNumber} 更新为 ${newNumber}，已批量更新所有大于 ${oldNumber} 的序号，变化量 ${delta > 0 ? '+' : ''}${delta}`;
+                } else {
+                    statusBar.textContent = `序号已更新为 ${newNumber}`;
+                }
+            } else {
+                statusBar.textContent = '未找到对应的序号';
+            }
+        });
+    
+        numberInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                if (window.currentEditId) {
+                    // 如果是编辑模式，执行编辑确认
+                    const annId = window.currentEditId;
+                    const annIndex = annotations.findIndex(ann => ann.id.toString() === annId.toString());
+                    if (annIndex !== -1) {
+                        const oldNumber = annotations[annIndex].number;
+                        const newNumber = parseInt(numberInput.value);
+                        if (isNaN(newNumber) || newNumber <= 0) {
+                            statusBar.textContent = '请输入有效的正整数';
+                            return;
+                        }
+
+                        const batchUpdate = document.getElementById('batchUpdate').checked;
+                        const delta = newNumber - oldNumber;
+
+                        // 如果启用批量更新且变化量不为0，更新所有大于原序号的序号
+                        if (batchUpdate && delta !== 0) {
+                            annotations.forEach(ann => {
+                                if (ann.number > oldNumber) {
+                                    ann.number += delta;
+                                }
+                            });
+                        }
+
+                        // 更新当前标注信息
+                        annotations[annIndex].number = newNumber;
+                        
+                        // 重新渲染所有标注
+                        document.querySelectorAll('.circle-annotation').forEach(el => el.remove());
+                        annotations.forEach(ann => addAnnotationToPage(ann));
+                        
+                        numberModal.style.display = 'none';
+                        currentClickX = 0;
+                        currentClickY = 0;
+                        selectedAnnotation.classList.remove('selected');
+                        selectedAnnotation = null;
+                        window.currentEditId = null;
+                        
+                        if (batchUpdate && delta !== 0) {
+                            statusBar.textContent = `序号已从 ${oldNumber} 更新为 ${newNumber}，已批量更新所有大于 ${oldNumber} 的序号，变化量 ${delta > 0 ? '+' : ''}${delta}`;
+                        } else {
+                            statusBar.textContent = `序号已更新为 ${newNumber}`;
+                        }
+                    }
+                } else {
+                    // 如果是添加模式，执行添加确认
+                    addAnnotation();
+                }
+            }
+        });
+        
+        circleSize.addEventListener('input', () => {
+            circleSizeValue.textContent = `${circleSize.value}px`;
+        });
+        
+        textSize.addEventListener('input', () => {
+            textSizeValue.textContent = `${textSize.value}px`;
+        });
+        
+        // 添加PDF缩放控制事件
+        pdfScale.addEventListener('input', () => {
+            currentScale = parseFloat(pdfScale.value) / 100;
+            pdfScaleValue.textContent = `${Math.round(currentScale * 100)}%`;
+            if (pdfDoc) {
+                renderPDF(); // 重新渲染PDF以应用新的缩放比例
+            }
+        });
+        
+        // 鼠标滚轮缩放控制 - 修复只缩放PDF不缩放页面
+        document.addEventListener('wheel', (e) => {
+            // 检查是否按下了Ctrl键且有PDF文档加载
+            if (e.ctrlKey && pdfDoc) {
+                // 阻止浏览器默认的缩放行为
+                e.preventDefault();
+                
+                // 根据滚轮方向调整缩放比例
+                if (e.deltaY < 0) {
+                    // 向上滚动，放大
+                    currentScale = Math.min(currentScale + 0.1, 3); // 最大缩放3倍，和滑块范围保持一致
+                } else {
+                    // 向下滚动，缩小
+                    currentScale = Math.max(currentScale - 0.1, 0.5); // 最小缩放0.5倍，和滑块范围保持一致
+                }
+                
+                // 更新滑块和显示值
+                pdfScale.value = Math.round(currentScale * 100); // 修复：需要转换为百分比数值
+                pdfScaleValue.textContent = `${Math.round(currentScale * 100)}%`;
+                
+                // 重新渲染PDF
+                renderPDF();
+                
+                // 更新状态栏
+                statusBar.textContent = `PDF缩放已调整为 ${Math.round(currentScale * 100)}%`;
+            }
+        }, { passive: false }); // passive: false 允许调用preventDefault
+        
+        // 额外阻止浏览器默认快捷键缩放
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0')) || 
+                (e.metaKey && (e.key === '+' || e.key === '-' || e.key === '0'))) {
+                e.preventDefault();
+            }
+        });
+        
+        // 添加识别纸张尺寸的函数
+        function identifyPaperSize(width, height) {
+            const minDim = Math.min(width, height);
+            const maxDim = Math.max(width, height);
+            
+            // A4 近似 595 × 842 点
+            if (Math.abs(width - 595) < 20 && Math.abs(height - 842) < 20) return 'A4';
+            if (Math.abs(width - 842) < 20 && Math.abs(height - 595) < 20) return 'A4 横版';
+            
+            // A3 近似 842 × 1190 点
+            if (Math.abs(width - 842) < 20 && Math.abs(height - 1190) < 20) return 'A3';
+            if (Math.abs(width - 1190) < 20 && Math.abs(height - 842) < 20) return 'A3 横版';
+            
+            // B5 近似 516 × 729 点
+            if (Math.abs(width - 516) < 20 && Math.abs(height - 729) < 20) return 'B5';
+            if (Math.abs(width - 729) < 20 && Math.abs(height - 516) < 20) return 'B5 横版';
+            
+            return `自定义(${Math.round(width)}×${Math.round(height)})`;
+        }
+
+        async function renderPDF() {
+            if (!pdfDoc) {
+                statusBar.textContent = 'PDF文档未加载';
+                return;
+            }
+            
+            pdfContainer.innerHTML = '';
+            
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                try {
+                    const page = await pdfDoc.getPage(i);
+                    const viewport = page.getViewport({scale: 1.0});
+                    const rotation = page.rotate || 0;
+                    let originalWidth, originalHeight;
+                    
+                    if ([90, 270].includes(rotation)) {
+                        originalWidth = viewport.height;
+                        originalHeight = viewport.width;
+                    } else {
+                        originalWidth = viewport.width;
+                        originalHeight = viewport.height;
+                    }
+                    
+                    // 识别图幅尺寸（单位是点，1英寸=72点，A4是210mm×297mm ≈ 595×842点）
+                    let paperSize = identifyPaperSize(originalWidth, originalHeight);
+                    console.log(`页面 ${i}: 尺寸 ${Math.round(originalWidth)} × ${Math.round(originalHeight)} 点，识别为${paperSize}，旋转角度 ${rotation} 度`);
+                    
+                    // 使用当前缩放重新获取viewport
+                    const scaledViewport = page.getViewport({scale: currentScale});
+                    
+                    const container = document.createElement('div');
+                    container.className = 'pdf-page';
+                    container.dataset.pageNumber = i;
+                    container.style.width = `${scaledViewport.width}px`;
+                    container.style.height = `${scaledViewport.height}px`;
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    if (!context) {
+                        throw new Error('无法获取canvas 2D上下文');
+                    }
+                    
+                    canvas.height = scaledViewport.height;
+                    canvas.width = scaledViewport.width;
+                    
+                    container.appendChild(canvas);
+                    pdfContainer.appendChild(container);
+                    
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: scaledViewport
+                    };
+                    
+                    await page.render(renderContext).promise;
+   
+                    // 添加点击事件监听器
+                    container.addEventListener('click', (e) => {
+                        if (isAddingMode) {
+                            const rect = container.getBoundingClientRect();
+                            // 修正：将点击坐标除以当前缩放比例，获取原始PDF坐标
+                            currentClickX = (e.clientX - rect.left) / currentScale;
+                            currentClickY = (e.clientY - rect.top) / currentScale;
+                            currentPageNumber = parseInt(container.dataset.pageNumber);
+                            
+                            numberInput.value = annotations.length + 1;
+                            numberModal.style.display = 'flex';
+                            numberInput.focus();
+                            
+                            statusBar.textContent = '请输入序号数字，按回车键确认';
+                        }
+                    });
+                    
+                } catch (error) {
+                    statusBar.textContent = `渲染第${i}页失败: ${error.message}`;
+                    console.error(`Error rendering page ${i}:`, error);
+                }
+            }
+            
+            // 重新添加已有的标注
+            annotations.forEach(ann => addAnnotationToPage(ann));
+        }
+        
+        function toggleAddMode() {
+            if (!pdfDoc) {
+                statusBar.textContent = '请先加载PDF文件';
+                return;
+            }
+            
+            isAddingMode = !isAddingMode;
+            
+            // 如果进入添加模式，自动退出删除模式
+            if (isAddingMode) {
+                if (isDeleteMode) {
+                    isDeleteMode = false;
+                    deleteBtn.classList.remove('active');
+                    deleteBtn.textContent = '🗑️ 删除序号';
+                }
+                
+                addIndicator.classList.add('active');
+                toggleAddBtn.classList.remove('start');
+                toggleAddBtn.classList.add('stop');
+                toggleAddBtn.textContent = '✅ 添加模式';
+                toggleAddBtn.insertBefore(addIndicator, toggleAddBtn.firstChild);
+                document.body.classList.add('adding-mode');
+                
+                document.querySelectorAll('.pdf-page').forEach(page => {
+                    page.style.cursor = 'crosshair';
+                });
+                
+                statusBar.textContent = '点击PDF页面任意位置添加序号（可连续添加）';
+            } else {
+                stopAddMode();
+            }
+        }
+        
+        function stopAddMode() {
+            isAddingMode = false;
+            addIndicator.classList.remove('active');
+            toggleAddBtn.classList.remove('stop');
+            toggleAddBtn.classList.add('start');
+            toggleAddBtn.textContent = '开始添加序号';
+            toggleAddBtn.insertBefore(addIndicator, toggleAddBtn.firstChild);
+            document.body.classList.remove('adding-mode');
+            
+            document.querySelectorAll('.pdf-page').forEach(page => {
+                page.style.cursor = 'default';
+            });
+            
+            statusBar.textContent = '已停止添加模式';
+        }
+        
+        function cancelAddAnnotation() {
+            numberModal.style.display = 'none';
+            // 关键修复：取消时也清空点击位置信息
+            currentClickX = 0;
+            currentClickY = 0;
+            window.currentEditId = null;
+            statusBar.textContent = '已取消添加';
+        }
+        
+function addAnnotation() {
+    if (currentClickX === 0 || currentClickY === 0) {
+        statusBar.textContent = '请先在PDF页面上点击选择位置';
+        return;
+    }
+    const number = parseInt(numberInput.value);
+    if (isNaN(number) || number <= 0) {
+        statusBar.textContent = '请输入有效的正整数';
+        return;
+    }
+    const borderColor = document.getElementById('circleBorderColor').value;
+    const fillColor = document.getElementById('circleFillColor').value;
+    const textColor = document.getElementById('textColor').value;
+    const shape = document.getElementById('shapeType').value;
+
+    const ann = {
+        id: Date.now() + Math.random(),
+        page: currentPageNumber,
+        x: currentClickX,
+        y: currentClickY,
+        number: number,
+        size: parseInt(circleSize.value),
+        textSize: parseInt(textSize.value),
+        borderColor: borderColor,
+        fillColor: fillColor,
+        textColor: textColor,
+        shape: shape
+    };
+    annotations.push(ann);
+    addAnnotationToPage(ann);
+    numberModal.style.display = 'none';
+    currentClickX = 0;
+    currentClickY = 0;
+    statusBar.textContent = `已添加序号 ${number}，可继续添加或点击"停止添加"`;
+}
+        
+// 在 addAnnotationToPage 函数中，确保不要重复绑定点击事件
+function addAnnotationToPage(ann) {
+    const pageContainer = document.querySelector(`.pdf-page[data-page-number="${ann.page}"]`);
+    if (!pageContainer) {
+        statusBar.textContent = `未找到第${ann.page}页`;
+        return;
+    }
+    const existingAnn = document.getElementById(`ann-${ann.id}`);
+    if (existingAnn) {
+        existingAnn.remove();
+    }
+    const annElement = document.createElement('div');
+    annElement.className = `circle-annotation shape-${ann.shape || 'circle'}`;
+    annElement.id = `ann-${ann.id}`;
+    // 根据当前缩放比例调整位置和大小
+    annElement.style.left = `${ann.x * currentScale}px`;
+    annElement.style.top = `${ann.y * currentScale}px`;
+    annElement.style.width = `${ann.size * currentScale}px`;
+    annElement.style.height = `${ann.size * currentScale}px`;
+    annElement.style.fontSize = `${ann.textSize * currentScale}px`;
+    
+    // 设置颜色
+    const shape = ann.shape || 'circle';
+    annElement.style.borderColor = ann.borderColor || '#000000';
+    annElement.style.backgroundColor = ann.fillColor || '#FFFFFF';
+    annElement.style.color = ann.textColor || '#000000';
+    annElement.style.borderWidth = '2px';
+    annElement.style.borderStyle = 'solid';
+    
+    annElement.textContent = ann.number;
+
+    // 不要在这里添加点击事件，因为已经在全局绑定过了
+    pageContainer.appendChild(annElement);
+}
+
+// 确保所有事件仅绑定一次
+// 如果存在多次调用上述事件绑定代码的情况，请合并到一个初始化函数中，并确保只调用一次
+        
+        function deleteSelected() {
+            if (!selectedAnnotation) {
+                statusBar.textContent = '请先点击选择要删除的序号';
+                return;
+            }
+            
+            const annId = selectedAnnotation.id.replace('ann-', '');
+            annotations = annotations.filter(ann => ann.id.toString() !== annId.toString());
+            
+            selectedAnnotation.remove();
+            selectedAnnotation = null;
+            statusBar.textContent = '已删除选中的序号';
+        }
+        
+async function saveAsPDF() {
+    if (!pdfDoc) {
+        statusBar.textContent = '请先加载PDF文件';
+        return;
+    }
+    if (!window.pdfBytes) {
+        statusBar.textContent = 'PDF数据未正确加载';
+        return;
+    }
+    try {
+        statusBar.textContent = '正在准备PDF生成...';
+
+        const { PDFDocument, rgb, StandardFonts } = PDFLib;
+        const pdfDocOrig = await PDFDocument.load(window.pdfBytes);
+        const pages = pdfDocOrig.getPages();
+        // 嵌入Helvetica加粗字体
+        const helveticaBold = await pdfDocOrig.embedFont(StandardFonts.HelveticaBold);
+
+        // 处理每个页面的标注
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+            // 获取pdf.js页面以获取正确的尺寸信息
+            const pdfJsPage = await pdfDoc.getPage(i);
+            const viewport = pdfJsPage.getViewport({scale: 1.0}); // 使用1.0缩放获取原始尺寸
+            
+            // 获取HTML页面容器
+            const pageContainer = document.querySelector(`.pdf-page[data-page-number="${i}"]`);
+            if (!pageContainer) continue;
+            
+            // 获取PDF页面的原始尺寸
+            const pdfPage = pages[i - 1];
+            if (!pdfPage) continue;
+            
+            const { width: pdfPageWidth, height: pdfPageHeight } = pdfPage.getSize();
+            
+            // 获取PDF页面的旋转角度
+            const rotation = pdfJsPage.rotate || 0;
+            
+            // 计算精确的缩放比例（关键修正）
+            let scaleX, scaleY;
+            if ([90, 270].includes(rotation)) {
+                // 横向页面：宽高互换
+                scaleX = pdfPageHeight / viewport.width;
+                scaleY = pdfPageWidth / viewport.height;
+            } else {
+                // 纵向页面
+                scaleX = pdfPageWidth / viewport.width;
+                scaleY = pdfPageHeight / viewport.height;
+            }
+            
+            // 处理这一页的所有标注
+            const pageAnnotations = annotations.filter(ann => ann.page === i);
+            
+            pageAnnotations.forEach(ann => {
+                // 将标注坐标转换为PDF坐标（关键修正）
+                let xInPdf, yInPdf;
+                
+                // 根据旋转角度调整坐标转换
+                switch(rotation) {
+                    case 0:
+                        // 正常纵向页面
+                        xInPdf = ann.x * scaleX;
+                        yInPdf = pdfPageHeight - ann.y * scaleY;
+                        break;
+                    case 90:
+                        // 顺时针旋转90度
+                        xInPdf = ann.y * scaleY;
+                        yInPdf = ann.x * scaleX;
+                        break;
+                    case 180:
+                        // 旋转180度
+                        xInPdf = pdfPageWidth - ann.x * scaleX;
+                        yInPdf = ann.y * scaleY;
+                        break;
+                    case 270:
+                        // 顺时针旋转270度
+                        xInPdf = pdfPageHeight - ann.y * scaleY;
+                        yInPdf = pdfPageWidth - ann.x * scaleX;
+                        break;
+                    default:
+                        xInPdf = ann.x * scaleX;
+                        yInPdf = pdfPageHeight - ann.y * scaleY;
+                }
+                
+                // 大小转换
+                const textSizeInPdf = ann.textSize * Math.min(scaleX, scaleY);
+                const shapeSizeInPdf = ann.size * Math.min(scaleX, scaleY);
+                const halfSize = shapeSizeInPdf / 2;
+                const borderWidth = Math.max(0.5, textSizeInPdf * 0.1);
+                const borderColorRGB = rgb(...hexToRgb(ann.borderColor || '#000000'));
+                const fillColorRGB = rgb(...hexToRgb(ann.fillColor || '#FFFFFF'));
+                
+                // 绘制不同形状
+                const shape = ann.shape || 'circle';
+                switch(shape) {
+                    case 'circle':
+                        pdfPage.drawCircle({
+                            x: xInPdf,
+                            y: yInPdf,
+                            size: halfSize,
+                            borderColor: borderColorRGB,
+                            borderWidth: borderWidth,
+                            color: fillColorRGB
+                        });
+                        break;
+                    case 'square':
+                        pdfPage.drawRectangle({
+                            x: xInPdf - halfSize,
+                            y: yInPdf - halfSize,
+                            width: shapeSizeInPdf,
+                            height: shapeSizeInPdf,
+                            borderColor: borderColorRGB,
+                            borderWidth: borderWidth,
+                            color: fillColorRGB
+                        });
+                        break;
+                }
+
+                // 绘制文本（根据页面旋转调整文本方向）
+                const text = ann.number.toString();
+                const textWidthEstimate = textSizeInPdf * ann.number.toString().length * 0.55;
+                // 调整基线偏移，使文本垂直居中
+                const textBaselineOffset = textSizeInPdf * 0.3; // 略微减小基线偏移
+                
+                switch(rotation) {
+                    case 90:
+                        console.log(`页面旋转角度:90度`);
+                        pdfPage.drawText(text, {
+                            x: xInPdf + textWidthEstimate / 2,
+                            y: yInPdf - textWidthEstimate / 2,
+                            size: textSizeInPdf,
+                            color: rgb(...hexToRgb(ann.textColor || '#000000')),
+                            rotate: { type: 'degrees', angle: 90 },
+                            font: helveticaBold
+                        });
+                        break;
+                    case 180:
+                        pdfPage.drawText(text, {
+                            x: xInPdf - textWidthEstimate / 2,
+                            y: yInPdf + textBaselineOffset,
+                            size: textSizeInPdf,
+                            color: rgb(...hexToRgb(ann.textColor || '#000000')),
+                            rotate: { type: 'degrees', angle: 180 },
+                            font: helveticaBold
+                        });
+                        break;
+                    case 270:
+                        pdfPage.drawText(text, {
+                            x: xInPdf + textBaselineOffset,
+                            y: yInPdf + textWidthEstimate / 2,
+                            size: textSizeInPdf,
+                            color: rgb(...hexToRgb(ann.textColor || '#000000')),
+                            rotate: { type: 'degrees', angle: 270 },
+                            font: helveticaBold
+                        });
+                        break;
+                    default:
+                        pdfPage.drawText(text, {
+                            x: xInPdf - textWidthEstimate / 2,
+                            y: yInPdf - textBaselineOffset,
+                            size: textSizeInPdf,
+                            color: rgb(...hexToRgb(ann.textColor || '#000000')),
+                            font: helveticaBold
+                        });
+                }
+                // 删除了重复的switch语句，避免文字绘制两遍 - 修复完成
+            });
+        }
+
+        const pdfBytes = await pdfDocOrig.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = '已标记的文档.pdf';
+        link.click();
+        statusBar.textContent = 'PDF保存成功！';
+    } catch (error) {
+        statusBar.textContent = 'PDF生成失败: ' + error.message;
+        console.error('Error generating PDF:', error);
+    }
+}
+
+// 辅助函数用于将十六进制颜色转换为RGB
+function hexToRgb(hex) {
+    // Remove the hash symbol if present
+    hex = hex.replace(/^#/, '');
+    // 如果是3位十六进制，扩展为6位
+    if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+    }
+    // Parse r, g, b values from hex string
+    let bigint = parseInt(hex, 16);
+    let r = (bigint >> 16) & 255;
+    let g = (bigint >> 8) & 255;
+    let b = bigint & 255;
+    return [r / 255, g / 255, b / 255];
+}
+     
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.pdf-page') && 
+                !e.target.closest('.modal') && 
+                !e.target.closest('#toggleAddBtn') &&
+                !e.target.closest('.controls') &&
+                !e.target.closest('.controls-container') &&
+                isAddingMode) {
+                stopAddMode();
+            }
+        });
+    </script>
+
+</body></html>
